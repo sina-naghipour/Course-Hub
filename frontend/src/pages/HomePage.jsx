@@ -112,13 +112,15 @@ const HomePage = () => {
 
   return (
     <Box>
-      {/* Hero Section */}
       <Box
         sx={{
-          background: 'linear-gradient(135deg, #fafafa 0%, #ffffff 100%)',
+          background: (theme) => 
+            theme.palette.mode === 'light' 
+              ? 'linear-gradient(135deg, #fafafa 0%, #ffffff 100%)'
+              : 'linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%)',
           py: { xs: 8, md: 12 },
           borderBottom: '1px solid',
-          borderColor: 'grey.200',
+          borderColor: 'divider',
         }}
       >
         <Container maxWidth="lg">
@@ -172,12 +174,12 @@ const HomePage = () => {
                 sx={{
                   width: '100%',
                   height: 400,
-                  backgroundColor: 'grey.100',
+                  backgroundColor: 'background.default',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   border: '1px solid',
-                  borderColor: 'grey.300',
+                  borderColor: 'divider',
                 }}
               >
                 <Typography color="text.secondary">
@@ -189,12 +191,11 @@ const HomePage = () => {
         </Container>
       </Box>
 
-      {/* Stats Section */}
       <Container maxWidth="lg" sx={{ py: 8 }}>
         <Grid container spacing={4}>
           {stats.map((stat, index) => (
             <Grid item xs={6} md={3} key={index}>
-              <Card variant="outlined" sx={{ textAlign: 'center', p: 3, borderColor: 'grey.200' }}>
+              <Card variant="outlined" sx={{ textAlign: 'center', p: 3, borderColor: 'divider' }}>
                 <Box sx={{ color: 'primary.main', mb: 1, fontSize: '2.5rem' }}>
                   {stat.icon}
                 </Box>
@@ -210,12 +211,10 @@ const HomePage = () => {
         </Grid>
       </Container>
 
-      {/* Search Section */}
       <Container maxWidth="lg" sx={{ py: 8 }}>
         <SearchBar onSearch={handleSearch} />
       </Container>
 
-      {/* Categories Section */}
       <Container maxWidth="lg" sx={{ py: 8 }}>
         <Typography variant="h3" component="h2" textAlign="center" gutterBottom sx={{ fontWeight: 600, mb: 6 }}>
           Learning Domains
@@ -244,8 +243,7 @@ const HomePage = () => {
         </Grid>
       </Container>
 
-      {/* Featured Courses */}
-      <Box sx={{ bgcolor: 'grey.50', py: 8 }}>
+      <Box sx={{ bgcolor: 'background.default', py: 8 }}>
         <Container maxWidth="lg">
           <Typography variant="h3" component="h2" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
             Curated Excellence
@@ -270,7 +268,6 @@ const HomePage = () => {
         </Container>
       </Box>
 
-      {/* Reviews Section */}
       <Container maxWidth="lg" sx={{ py: 8 }}>
         <Typography variant="h3" component="h2" textAlign="center" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
           Trusted by Professionals

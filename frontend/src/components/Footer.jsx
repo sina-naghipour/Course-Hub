@@ -12,10 +12,9 @@ import SchoolIcon from '@mui/icons-material/School';
 
 const Footer = () => {
   return (
-    <Box component="footer" sx={{ bgcolor: 'grey.50', py: 6, mt: 'auto' }}>
+    <Box component="footer" sx={{ bgcolor: 'background.paper', py: 6, mt: 'auto', borderTop: '1px solid', borderColor: 'divider' }}>
       <Container maxWidth="xl">
         <Grid container spacing={4}>
-          {/* Brand Section */}
           <Grid item xs={12} md={4}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <SchoolIcon sx={{ mr: 1, fontSize: 32 }} />
@@ -29,7 +28,6 @@ const Footer = () => {
             </Typography>
           </Grid>
 
-          {/* Quick Links */}
           <Grid item xs={6} md={2}>
             <Typography variant="h6" gutterBottom fontWeight={600}>
               Navigation
@@ -49,26 +47,30 @@ const Footer = () => {
             </Box>
           </Grid>
 
-          {/* Support */}
           <Grid item xs={6} md={2}>
             <Typography variant="h6" gutterBottom fontWeight={600}>
               Support
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {['Help Center', 'Contact Us', 'Privacy Policy', 'Terms of Service'].map((item) => (
+              {[
+                { label: 'Help Center', path: '/help-center' },
+                { label: 'Contact Us', path: '/contact-us' },
+                { label: 'Privacy Policy', path: '/privacy-policy' },
+                { label: 'Terms of Service', path: '/terms-of-service' }
+              ].map((item) => (
                 <Link
-                  key={item}
-                  href="#"
+                  key={item.label}
+                  component={RouterLink}
+                  to={item.path}
                   color="text.secondary"
                   sx={{ textDecoration: 'none', '&:hover': { color: 'primary.main' } }}
                 >
-                  {item}
+                  {item.label}
                 </Link>
               ))}
             </Box>
           </Grid>
 
-          {/* Contact Info */}
           <Grid item xs={12} md={4}>
             <Typography variant="h6" gutterBottom fontWeight={600}>
               Contact
@@ -87,7 +89,6 @@ const Footer = () => {
 
         <Divider sx={{ my: 4 }} />
 
-        {/* Copyright */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="body2" color="text.secondary">
             © 2024 CourseHub. Crafted with Swiss precision.
