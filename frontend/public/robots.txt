@@ -1,0 +1,9 @@
+# Swiss precision for search engines
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://coursehub.ch/sitemap.xml
+
+# CourseHub - Quality Education Platform
+# Precision, Clarity, Excellence

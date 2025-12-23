@@ -69,7 +69,6 @@ build/
 
 # Gatsby files
 .cache/
-public
 
 # Next.js
 .next/
