@@ -13,7 +13,7 @@ import {
   Slider,
   Chip,
   Pagination,
-  Button // Add this import
+  Button
 } from '@mui/material';
 import { courseService } from '../services/courseService';
 import CourseCard from '../components/CourseCard';
@@ -31,16 +31,31 @@ const CourseSearchPage = () => {
   });
   const [sortOption, setSortOption] = useState('');
   const [page, setPage] = useState(1);
+  const [actualPriceRange, setActualPriceRange] = useState([0, 5000000]); // Store actual prices
   const coursesPerPage = 8;
 
   useEffect(() => {
     const allCourses = courseService.getCourses();
     setCourses(allCourses);
     setFilteredCourses(allCourses);
+    
+    // Calculate actual price range from courses
+    if (allCourses.length > 0) {
+      const prices = allCourses.map(c => c.price || 0);
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      setActualPriceRange([minPrice, maxPrice]);
+    }
   }, []);
 
   const handleSearch = (query) => {
-    const filtered = courseService.filterAndSortCourses(courses, { search: query }, sortOption);
+    const filtered = courseService.filterAndSortCourses(courses, { 
+      search: query,
+      category: filters.category,
+      level: filters.level,
+      language: filters.language,
+      priceRange: filters.priceRange
+    }, sortOption);
     setFilteredCourses(filtered);
     setPage(1);
   };
@@ -49,7 +64,16 @@ const CourseSearchPage = () => {
     const newFilters = { ...filters, [filterName]: value };
     setFilters(newFilters);
     
-    const filtered = courseService.filterAndSortCourses(courses, newFilters, sortOption);
+    // Create filter object with converted price range
+    const filterObj = {
+      search: '',
+      category: newFilters.category,
+      level: newFilters.level,
+      language: newFilters.language,
+      priceRange: newFilters.priceRange
+    };
+    
+    const filtered = courseService.filterAndSortCourses(courses, filterObj, sortOption);
     setFilteredCourses(filtered);
     setPage(1);
   };
@@ -58,7 +82,15 @@ const CourseSearchPage = () => {
     const value = event.target.value;
     setSortOption(value);
     
-    const filtered = courseService.filterAndSortCourses(courses, filters, value);
+    const filterObj = {
+      search: '',
+      category: filters.category,
+      level: filters.level,
+      language: filters.language,
+      priceRange: filters.priceRange
+    };
+    
+    const filtered = courseService.filterAndSortCourses(courses, filterObj, value);
     setFilteredCourses(filtered);
   };
 
@@ -74,6 +106,107 @@ const CourseSearchPage = () => {
     setPage(1);
   };
 
+  // Convert slider value (0-500) to actual price (0-5,000,000)
+  const convertToActualPrice = (sliderValue) => {
+    const [minSlider, maxSlider] = [0, 500];
+    const [minActual, maxActual] = actualPriceRange;
+    return (sliderValue / maxSlider) * maxActual;
+  };
+
+  // Convert actual price to slider value (0-500)
+  const convertToSliderValue = (actualPrice) => {
+    const [minSlider, maxSlider] = [0, 500];
+    const [minActual, maxActual] = actualPriceRange;
+    return (actualPrice / maxActual) * maxSlider;
+  };
+
+  // Custom filter function that handles price conversion
+  const customFilterCourses = (coursesToFilter, currentFilters) => {
+    return coursesToFilter.filter(course => {
+      // Category filter
+      if (currentFilters.category && course.category !== currentFilters.category) {
+        return false;
+      }
+      
+      // Level filter
+      if (currentFilters.level && course.level !== currentFilters.level) {
+        return false;
+      }
+      
+      // Language filter
+      if (currentFilters.language && course.language !== currentFilters.language) {
+        return false;
+      }
+      
+      // Price range filter - CONVERTED
+      if (currentFilters.priceRange) {
+        const [minSlider, maxSlider] = currentFilters.priceRange;
+        const coursePrice = course.price || 0;
+        const courseSliderValue = convertToSliderValue(coursePrice);
+        
+        if (courseSliderValue < minSlider || courseSliderValue > maxSlider) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  };
+
+  const handlePriceFilterChange = (_, newValue) => {
+    const newFilters = { ...filters, priceRange: newValue };
+    setFilters(newFilters);
+    
+    // Apply custom filtering for price
+    let filtered = [...courses];
+    
+    // Apply other filters first
+    if (newFilters.category) {
+      filtered = filtered.filter(course => course.category === newFilters.category);
+    }
+    
+    if (newFilters.level) {
+      filtered = filtered.filter(course => course.level === newFilters.level);
+    }
+    
+    if (newFilters.language) {
+      filtered = filtered.filter(course => course.language === newFilters.language);
+    }
+    
+    // Apply price filter with conversion
+    if (newFilters.priceRange) {
+      const [minSlider, maxSlider] = newFilters.priceRange;
+      filtered = filtered.filter(course => {
+        const coursePrice = course.price || 0;
+        const courseSliderValue = convertToSliderValue(coursePrice);
+        return courseSliderValue >= minSlider && courseSliderValue <= maxSlider;
+      });
+    }
+    
+    // Apply sorting
+    if (sortOption) {
+      switch (sortOption) {
+        case 'titleAsc':
+          filtered.sort((a, b) => a.title.localeCompare(b.title));
+          break;
+        case 'priceAsc':
+          filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+          break;
+        case 'priceDesc':
+          filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+          break;
+        case 'ratingDesc':
+          filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+          break;
+        default:
+          break;
+      }
+    }
+    
+    setFilteredCourses(filtered);
+    setPage(1);
+  };
+
   // Pagination
   const indexOfLastCourse = page * coursesPerPage;
   const indexOfFirstCourse = indexOfLastCourse - coursesPerPage;
@@ -83,6 +216,16 @@ const CourseSearchPage = () => {
   const categories = [...new Set(courses.map(course => course.category))];
   const levels = [...new Set(courses.map(course => course.level))];
   const languages = [...new Set(courses.map(course => course.language))];
+
+  // Format price for display
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(price);
+  };
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -156,19 +299,28 @@ const CourseSearchPage = () => {
                 </Select>
               </FormControl>
 
-              {/* Price Range */}
+              {/* Price Range - UPDATED */}
               <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle2" gutterBottom>
-                  Price Range: ${filters.priceRange[0]} - ${filters.priceRange[1]}
+                  Price Range: {formatPrice(convertToActualPrice(filters.priceRange[0]))} - {formatPrice(convertToActualPrice(filters.priceRange[1]))}
                 </Typography>
                 <Slider
                   value={filters.priceRange}
-                  onChange={(_, newValue) => handleFilterChange('priceRange', newValue)}
+                  onChange={handlePriceFilterChange}
                   valueLabelDisplay="auto"
                   min={0}
                   max={500}
+                  valueLabelFormat={(value) => formatPrice(convertToActualPrice(value))}
                   sx={{ color: 'primary.main' }}
                 />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {formatPrice(convertToActualPrice(0))}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {formatPrice(convertToActualPrice(500))}
+                  </Typography>
+                </Box>
               </Box>
 
               {/* Active Filters */}
@@ -197,6 +349,13 @@ const CourseSearchPage = () => {
                         label={`Language: ${filters.language}`} 
                         size="small" 
                         onDelete={() => handleFilterChange('language', '')}
+                      />
+                    )}
+                    {(filters.priceRange[0] > 0 || filters.priceRange[1] < 500) && (
+                      <Chip 
+                        label={`Price: ${formatPrice(convertToActualPrice(filters.priceRange[0]))} - ${formatPrice(convertToActualPrice(filters.priceRange[1]))}`}
+                        size="small"
+                        onDelete={() => handlePriceFilterChange(null, [0, 500])}
                       />
                     )}
                   </Box>

@@ -15,6 +15,7 @@ import {
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { courseService } from '../services/courseService';
 import { reservationService } from '../services/reservationService';
+import { storage, validateCardNumber, validateExpiryDate, validateCVV } from '../utils/validation';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
 
@@ -26,7 +27,6 @@ const CourseReservationPage = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [reservationComplete, setReservationComplete] = useState(false);
   
   const [formData, setFormData] = useState({
     // Personal Information
@@ -51,6 +51,18 @@ const CourseReservationPage = () => {
   useEffect(() => {
     const foundCourse = courseService.getCourseById(id);
     setCourse(foundCourse);
+    
+    // Pre-fill user information if logged in
+    const currentUser = storage.getUser();
+    if (currentUser) {
+      setFormData(prev => ({
+        ...prev,
+        firstName: currentUser.firstName || '',
+        lastName: currentUser.lastName || '',
+        email: currentUser.email || '',
+        phone: currentUser.phone || '',
+      }));
+    }
   }, [id]);
 
   const handleChange = (e) => {
@@ -79,10 +91,13 @@ const CourseReservationPage = () => {
     }
     
     if (step === 2) {
-      if (!formData.cardNumber.trim()) newErrors.cardNumber = 'Card number is required';
-      if (!formData.expiryDate.trim()) newErrors.expiryDate = 'Expiry date is required';
-      if (!formData.cvv.trim()) newErrors.cvv = 'CVV is required';
       if (!formData.cardholderName.trim()) newErrors.cardholderName = 'Cardholder name is required';
+      if (!formData.cardNumber.trim()) newErrors.cardNumber = 'Card number is required';
+      else if (!validateCardNumber(formData.cardNumber)) newErrors.cardNumber = 'Invalid card number';
+      if (!formData.expiryDate.trim()) newErrors.expiryDate = 'Expiry date is required';
+      else if (!validateExpiryDate(formData.expiryDate)) newErrors.expiryDate = 'Invalid or expired date';
+      if (!formData.cvv.trim()) newErrors.cvv = 'CVV is required';
+      else if (!validateCVV(formData.cvv)) newErrors.cvv = 'Invalid CVV';
     }
     
     setErrors(newErrors);
@@ -103,21 +118,36 @@ const CourseReservationPage = () => {
     setLoading(true);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      const currentUser = storage.getUser();
+      const userEmail = currentUser?.email || formData.email;
       
       const reservationData = {
         courseId: course.id,
         courseTitle: course.title,
+        courseInstructor: course.instructor,
         coursePrice: course.price,
-        ...formData,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        seats: formData.seats,
+        specialRequests: formData.specialRequests,
         totalAmount: course.price * formData.seats,
-        reservationDate: new Date().toISOString(),
+        date: new Date().toISOString(),
+        status: 'confirmed',
+        user: userEmail, // Store user email for filtering
+        userId: currentUser?.id
       };
       
+      // Save booking using storage utility
+      storage.saveBooking(reservationData);
+      
+      // Also add via reservation service
       const result = reservationService.addReservation(reservationData);
       
       if (result.success) {
-        setReservationComplete(true);
         setActiveStep(3);
       } else {
         setErrors({ submit: result.message });
@@ -143,9 +173,12 @@ const CourseReservationPage = () => {
                   <Typography variant="body2" color="text.secondary" gutterBottom>
                     Instructor: {course.instructor}
                   </Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Duration: {course.duration}
+                  </Typography>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
                     <Typography variant="h6" color="primary.main" sx={{ fontWeight: 600 }}>
-                      ${course.price}
+                      ${course.price.toLocaleString()}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       per seat
@@ -189,6 +222,7 @@ const CourseReservationPage = () => {
                   onChange={handleChange}
                   required
                   error={errors.firstName}
+                  fullWidth
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -199,6 +233,7 @@ const CourseReservationPage = () => {
                   onChange={handleChange}
                   required
                   error={errors.lastName}
+                  fullWidth
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -210,6 +245,7 @@ const CourseReservationPage = () => {
                   onChange={handleChange}
                   required
                   error={errors.email}
+                  fullWidth
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -221,6 +257,7 @@ const CourseReservationPage = () => {
                   required
                   error={errors.phone}
                   placeholder="+41 76 123 45 67"
+                  fullWidth
                 />
               </Grid>
             </Grid>
@@ -240,6 +277,7 @@ const CourseReservationPage = () => {
                   required
                   error={errors.cardholderName}
                   placeholder="As shown on card"
+                  fullWidth
                 />
               </Grid>
               <Grid item xs={12}>
@@ -251,17 +289,19 @@ const CourseReservationPage = () => {
                   required
                   error={errors.cardNumber}
                   placeholder="1234 5678 9012 3456"
+                  fullWidth
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <InputField
-                  label="Expiry Date"
+                  label="Expiry Date (MM/YY)"
                   name="expiryDate"
                   value={formData.expiryDate}
                   onChange={handleChange}
                   required
                   error={errors.expiryDate}
                   placeholder="MM/YY"
+                  fullWidth
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -273,6 +313,7 @@ const CourseReservationPage = () => {
                   required
                   error={errors.cvv}
                   placeholder="123"
+                  fullWidth
                 />
               </Grid>
             </Grid>
@@ -285,13 +326,13 @@ const CourseReservationPage = () => {
                   </Typography>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2">{course.title}</Typography>
-                    <Typography variant="body2">${course.price} × {formData.seats}</Typography>
+                    <Typography variant="body2">${course.price.toLocaleString()} × {formData.seats}</Typography>
                   </Box>
                   <Divider sx={{ my: 1 }} />
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="h6" sx={{ fontWeight: 600 }}>Total</Typography>
                     <Typography variant="h6" color="primary.main" sx={{ fontWeight: 600 }}>
-                      ${course.price * formData.seats}
+                      ${(course.price * formData.seats).toLocaleString()}
                     </Typography>
                   </Box>
                 </CardContent>
@@ -303,7 +344,7 @@ const CourseReservationPage = () => {
       case 3:
         return (
           <Box textAlign="center">
-            <Alert severity="success" sx={{ mb: 3, borderRadius: 0 }}>
+            <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
               <Typography variant="h6" gutterBottom>
                 Reservation Confirmed!
               </Typography>
@@ -329,7 +370,7 @@ const CourseReservationPage = () => {
                       <strong>Seats:</strong> {formData.seats}
                     </Typography>
                     <Typography variant="body2" gutterBottom>
-                      <strong>Total Amount:</strong> ${course.price * formData.seats}
+                      <strong>Total Amount:</strong> ${(course.price * formData.seats).toLocaleString()}
                     </Typography>
                     <Typography variant="body2">
                       <strong>Reservation ID:</strong> {Date.now().toString()}
@@ -366,6 +407,9 @@ const CourseReservationPage = () => {
     return (
       <Container maxWidth="md" sx={{ py: 8, textAlign: 'center' }}>
         <Typography variant="h4" gutterBottom>Course Not Found</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          The course you're looking for doesn't exist or has been removed.
+        </Typography>
         <Button component={RouterLink} to="/courses" variant="contained">
           Browse Courses
         </Button>
@@ -396,7 +440,7 @@ const CourseReservationPage = () => {
 
       {/* Error Alert */}
       {errors.submit && (
-        <Alert severity="error" sx={{ mb: 3, borderRadius: 0 }}>
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
           {errors.submit}
         </Alert>
       )}

@@ -19,10 +19,10 @@ import {
   Avatar,
   Divider,
 } from '@mui/material';
-import { userService } from '../services/userService';
-import { reservationService } from '../services/reservationService';
+import { storage } from '../utils/validation';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
+import { useNavigate } from 'react-router-dom';
 
 function TabPanel({ children, value, index, ...other }) {
   return (
@@ -49,9 +49,16 @@ const UserProfilePage = () => {
     email: '',
     phone: '',
   });
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const currentUser = userService.getCurrentUser();
+    // Check if user is logged in
+    if (!storage.isLoggedIn()) {
+      navigate('/login');
+      return;
+    }
+
+    const currentUser = storage.getUser();
     if (currentUser) {
       setUser(currentUser);
       setFormData({
@@ -61,10 +68,14 @@ const UserProfilePage = () => {
         phone: currentUser.phone || '',
       });
       
-      const userReservations = reservationService.getUserReservations(currentUser.id);
+      // Get reservations from localStorage
+      const allReservations = storage.getBookings();
+      const userReservations = allReservations.filter(res => 
+        res.userId === currentUser.id || res.userEmail === currentUser.email
+      );
       setReservations(userReservations);
     }
-  }, []);
+  }, [navigate]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -79,31 +90,65 @@ const UserProfilePage = () => {
   };
 
   const handleSave = () => {
-    // In a real app, you would update the user profile here
-    console.log('Saving profile:', formData);
+    // Update user in localStorage
+    const updatedUser = {
+      ...user,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      phone: formData.phone
+      // Note: email shouldn't be changed as it's used for login
+    };
+    
+    storage.saveUser(updatedUser);
+    setUser(updatedUser);
     setEditMode(false);
+    
+    console.log('Profile updated:', updatedUser);
   };
 
   const handleCancel = () => {
     setFormData({
-      firstName: user.firstName || '',
-      lastName: user.lastName || '',
-      email: user.email || '',
-      phone: user.phone || '',
+      firstName: user?.firstName || '',
+      lastName: user?.lastName || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
     });
     setEditMode(false);
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(price);
+  };
+
+  // Calculate member since date
+  const getMemberSince = () => {
+    if (!user?.createdAt) return 'Jan 2024';
+    const date = new Date(user.createdAt);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short'
+    });
   };
 
   if (!user) {
     return (
       <Container maxWidth="lg" sx={{ py: 8, textAlign: 'center' }}>
-        <Typography variant="h4" gutterBottom>Please Log In</Typography>
+        <Typography variant="h4" gutterBottom>Loading Profile...</Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          You need to be logged in to view your profile.
+          Please wait while we load your information.
         </Typography>
-        <Button href="/login" variant="contained">
-          Sign In
-        </Button>
       </Container>
     );
   }
@@ -136,7 +181,7 @@ const UserProfilePage = () => {
                   mb: 2,
                 }}
               >
-                {user.firstName?.charAt(0) || user.email?.charAt(0).toUpperCase()}
+                {(user.firstName?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase()}
               </Avatar>
               
               <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
@@ -159,13 +204,13 @@ const UserProfilePage = () => {
 
               <Box sx={{ textAlign: 'left' }}>
                 <Typography variant="body2" gutterBottom>
-                  <strong>Member since:</strong> Jan 2024
+                  <strong>Member since:</strong> {getMemberSince()}
                 </Typography>
                 <Typography variant="body2" gutterBottom>
                   <strong>Courses enrolled:</strong> {reservations.length}
                 </Typography>
                 <Typography variant="body2">
-                  <strong>Learning level:</strong> Intermediate
+                  <strong>Account status:</strong> Verified
                 </Typography>
               </Box>
             </CardContent>
@@ -191,7 +236,7 @@ const UserProfilePage = () => {
               >
                 <Tab label="Profile" />
                 <Tab label="Reservations" />
-                <Tab label="Learning" />
+                <Tab label="Settings" />
               </Tabs>
 
               <TabPanel value={tabValue} index={0}>
@@ -208,6 +253,7 @@ const UserProfilePage = () => {
                         value={formData.firstName}
                         onChange={handleChange}
                         disabled={!editMode}
+                        fullWidth
                       />
                     </Grid>
                     <Grid item xs={12} sm={6}>
@@ -217,6 +263,7 @@ const UserProfilePage = () => {
                         value={formData.lastName}
                         onChange={handleChange}
                         disabled={!editMode}
+                        fullWidth
                       />
                     </Grid>
                     <Grid item xs={12}>
@@ -226,7 +273,9 @@ const UserProfilePage = () => {
                         name="email"
                         value={formData.email}
                         onChange={handleChange}
-                        disabled={!editMode}
+                        disabled={true} // Email should not be editable
+                        helperText="Email cannot be changed"
+                        fullWidth
                       />
                     </Grid>
                     <Grid item xs={12}>
@@ -237,6 +286,7 @@ const UserProfilePage = () => {
                         onChange={handleChange}
                         disabled={!editMode}
                         placeholder="+41 76 123 45 67"
+                        fullWidth
                       />
                     </Grid>
                   </Grid>
@@ -271,6 +321,7 @@ const UserProfilePage = () => {
                       <TableHead>
                         <TableRow>
                           <TableCell><strong>Course</strong></TableCell>
+                          <TableCell><strong>Instructor</strong></TableCell>
                           <TableCell><strong>Date</strong></TableCell>
                           <TableCell><strong>Status</strong></TableCell>
                           <TableCell align="right"><strong>Amount</strong></TableCell>
@@ -281,23 +332,28 @@ const UserProfilePage = () => {
                           <TableRow key={reservation.id}>
                             <TableCell>
                               <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                {reservation.courseTitle}
+                                {reservation.courseTitle || 'Course Name'}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              {new Date(reservation.date).toLocaleDateString()}
+                              <Typography variant="body2" color="text.secondary">
+                                {reservation.instructor || 'Instructor'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              {formatDate(reservation.date)}
                             </TableCell>
                             <TableCell>
                               <Chip 
-                                label={reservation.status} 
+                                label={reservation.status || 'confirmed'} 
                                 size="small"
-                                color={reservation.status === 'confirmed' ? 'success' : 'default'}
+                                color={reservation.status === 'confirmed' ? 'success' : 'warning'}
                                 variant="outlined"
                               />
                             </TableCell>
                             <TableCell align="right">
                               <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                ${reservation.totalAmount}
+                                {formatPrice(reservation.totalAmount || 0)}
                               </Typography>
                             </TableCell>
                           </TableRow>
@@ -310,7 +366,10 @@ const UserProfilePage = () => {
                     <Typography variant="body1" color="text.secondary" gutterBottom>
                       No reservations found.
                     </Typography>
-                    <Button href="/courses" variant="contained" sx={{ mt: 2 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                      Start your learning journey by enrolling in a course.
+                    </Typography>
+                    <Button onClick={() => navigate('/courses')} variant="contained" sx={{ mt: 2 }}>
                       Browse Courses
                     </Button>
                   </Box>
@@ -319,11 +378,50 @@ const UserProfilePage = () => {
 
               <TabPanel value={tabValue} index={2}>
                 <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>
-                  Learning Progress
+                  Account Settings
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Your learning dashboard and progress tracking will be available soon.
-                </Typography>
+                
+                <Grid container spacing={3}>
+                  <Grid item xs={12}>
+                    <Card variant="outlined" sx={{ borderColor: 'grey.200' }}>
+                      <CardContent>
+                        <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
+                          Security
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Manage your password and security settings
+                        </Typography>
+                        <Button 
+                          variant="outlined" 
+                          sx={{ mt: 2 }}
+                          onClick={() => navigate('/change-password')}
+                        >
+                          Change Password
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  
+                  <Grid item xs={12}>
+                    <Card variant="outlined" sx={{ borderColor: 'grey.200' }}>
+                      <CardContent>
+                        <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
+                          Notifications
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Configure your notification preferences
+                        </Typography>
+                        <Button 
+                          variant="outlined" 
+                          sx={{ mt: 2 }}
+                          onClick={() => console.log('Notification settings')}
+                        >
+                          Manage Notifications
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
               </TabPanel>
             </CardContent>
           </Card>

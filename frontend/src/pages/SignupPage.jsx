@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Card,
@@ -10,11 +10,12 @@ import {
   Stepper,
   Step,
   StepLabel,
+  Grid,
 } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
-import { validateEmail, validatePassword } from '../utils/validation';
+import { validateEmail, validatePassword, storage } from '../utils/validation';
 import SchoolIcon from '@mui/icons-material/School';
 
 const steps = ['Account Details', 'Personal Information', 'Confirmation'];
@@ -32,6 +33,11 @@ const SignupPage = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Initialize sample data
+    storage.initSampleData();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -74,10 +80,18 @@ const SignupPage = () => {
     if (step === 1) {
       if (!formData.firstName.trim()) {
         newErrors.firstName = 'First name is required';
+      } else if (formData.firstName.trim().length > 50) {
+        newErrors.firstName = 'First name cannot exceed 50 characters';
       }
       
       if (!formData.lastName.trim()) {
         newErrors.lastName = 'Last name is required';
+      } else if (formData.lastName.trim().length > 50) {
+        newErrors.lastName = 'Last name cannot exceed 50 characters';
+      }
+      
+      if (formData.phone && !/^[+]?[\d\s\-\(\)]{10,}$/.test(formData.phone)) {
+        newErrors.phone = 'Please enter a valid phone number';
       }
     }
     
@@ -101,9 +115,23 @@ const SignupPage = () => {
     
     if (validateStep(activeStep)) {
       try {
+        // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 1000));
-        console.log('Signup completed:', formData);
-        navigate('/login');
+        
+        // Save user to localStorage
+        const userData = {
+          id: Date.now(),
+          email: formData.email,
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          phone: formData.phone || '',
+          createdAt: new Date().toISOString()
+        };
+        
+        storage.saveUser(userData);
+        
+        console.log('Signup completed:', userData);
+        navigate('/login', { state: { message: 'Account created successfully! Please login.' } });
       } catch (error) {
         setErrors({ submit: 'Registration failed. Please try again.' });
       } finally {
@@ -118,104 +146,134 @@ const SignupPage = () => {
     switch (step) {
       case 0:
         return (
-          <Box>
-            <InputField
-              label="Email Address"
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="Enter your email"
-              required
-              error={errors.email}
-              sx={{ mb: 3 }}
-            />
-            
-            <InputField
-              label="Password"
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Create a password"
-              required
-              error={errors.password}
-              helperText="Minimum 6 characters"
-              sx={{ mb: 3 }}
-            />
-            
-            <InputField
-              label="Confirm Password"
-              type="password"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              placeholder="Confirm your password"
-              required
-              error={errors.confirmPassword}
-            />
-          </Box>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <InputField
+                label="Email Address"
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Enter your email"
+                required
+                error={errors.email}
+                fullWidth
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <InputField
+                label="Password"
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Create a password"
+                required
+                error={errors.password}
+                helperText="Minimum 6 characters"
+                fullWidth
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <InputField
+                label="Confirm Password"
+                type="password"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder="Confirm your password"
+                required
+                error={errors.confirmPassword}
+                fullWidth
+              />
+            </Grid>
+          </Grid>
         );
       
       case 1:
         return (
-          <Box>
-            <InputField
-              label="First Name"
-              name="firstName"
-              value={formData.firstName}
-              onChange={handleChange}
-              placeholder="Enter your first name"
-              required
-              error={errors.firstName}
-              sx={{ mb: 3 }}
-            />
-            
-            <InputField
-              label="Last Name"
-              name="lastName"
-              value={formData.lastName}
-              onChange={handleChange}
-              placeholder="Enter your last name"
-              required
-              error={errors.lastName}
-              sx={{ mb: 3 }}
-            />
-            
-            <InputField
-              label="Phone Number (Optional)"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="+41 76 123 45 67"
-              error={errors.phone}
-            />
-          </Box>
+          <Grid container spacing={3}>
+            <Grid item xs={12} sm={6}>
+              <InputField
+                label="First Name"
+                name="firstName"
+                value={formData.firstName}
+                onChange={handleChange}
+                placeholder="Enter your first name"
+                required
+                error={errors.firstName}
+                fullWidth
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <InputField
+                label="Last Name"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleChange}
+                placeholder="Enter your last name"
+                required
+                error={errors.lastName}
+                fullWidth
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <InputField
+                label="Phone Number (Optional)"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="+98 912 345 6789"
+                error={errors.phone}
+                helperText="Enter with country code"
+                fullWidth
+              />
+            </Grid>
+          </Grid>
         );
       
       case 2:
         return (
           <Box>
-            <Alert severity="info" sx={{ mb: 3, borderRadius: 0 }}>
-              Please review your information before creating your account.
+            <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+              <Typography variant="subtitle2">
+                Please review your information before creating your account.
+              </Typography>
+              <Typography variant="body2">
+                Your data will be stored securely in your browser's localStorage.
+              </Typography>
             </Alert>
             
-            <Box sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'grey.200', mb: 3 }}>
-              <Typography variant="subtitle2" gutterBottom>Account Details</Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Email: {formData.email}
-              </Typography>
-              
-              <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>Personal Information</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Name: {formData.firstName} {formData.lastName}
-              </Typography>
-              {formData.phone && (
-                <Typography variant="body2" color="text.secondary">
-                  Phone: {formData.phone}
+            <Card variant="outlined" sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+                  Account Details
                 </Typography>
-              )}
-            </Box>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  <strong>Email:</strong> {formData.email}
+                </Typography>
+                
+                <Divider sx={{ my: 2 }} />
+                
+                <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+                  Personal Information
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  <strong>Name:</strong> {formData.firstName} {formData.lastName}
+                </Typography>
+                {formData.phone && (
+                  <Typography variant="body2" color="text.secondary">
+                    <strong>Phone:</strong> {formData.phone}
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Alert severity="warning" sx={{ borderRadius: 2 }}>
+              <Typography variant="body2">
+                By creating an account, you agree to our Terms of Service and Privacy Policy.
+              </Typography>
+            </Alert>
           </Box>
         );
       
@@ -225,10 +283,10 @@ const SignupPage = () => {
   };
 
   return (
-    <Container maxWidth="sm" sx={{ py: 8 }}>
-      <Box sx={{ textAlign: 'center', mb: 6 }}>
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Box sx={{ textAlign: 'center', mb: 4 }}>
         <SchoolIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-        <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
+        <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
           Join CourseHub
         </Typography>
         <Typography variant="h6" color="text.secondary">
@@ -236,7 +294,7 @@ const SignupPage = () => {
         </Typography>
       </Box>
 
-      <Card variant="outlined" sx={{ borderColor: 'grey.200' }}>
+      <Card elevation={3}>
         <CardContent sx={{ p: 4 }}>
           <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
             {steps.map((label) => (
@@ -247,19 +305,22 @@ const SignupPage = () => {
           </Stepper>
 
           {errors.submit && (
-            <Alert severity="error" sx={{ mb: 3, borderRadius: 0 }}>
+            <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
               {errors.submit}
             </Alert>
           )}
 
           <form onSubmit={handleSubmit}>
-            {getStepContent(activeStep)}
+            <Box sx={{ mb: 4 }}>
+              {getStepContent(activeStep)}
+            </Box>
             
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
               <Button
                 onClick={handleBack}
                 disabled={activeStep === 0}
                 variant="outlined"
+                size="large"
               >
                 Back
               </Button>
@@ -268,6 +329,7 @@ const SignupPage = () => {
                 <Button 
                   type="submit"
                   variant="contained"
+                  size="large"
                   disabled={loading}
                 >
                   {loading ? 'Creating Account...' : 'Create Account'}
@@ -276,6 +338,7 @@ const SignupPage = () => {
                 <Button 
                   onClick={handleNext}
                   variant="contained"
+                  size="large"
                 >
                   Next
                 </Button>
@@ -292,7 +355,7 @@ const SignupPage = () => {
                   <Link 
                     to="/login" 
                     style={{ 
-                      color: '#000',
+                      color: 'primary.main',
                       textDecoration: 'none',
                       fontWeight: 600,
                     }}
@@ -305,6 +368,12 @@ const SignupPage = () => {
           )}
         </CardContent>
       </Card>
+      
+      <Box sx={{ mt: 4, textAlign: 'center' }}>
+        <Typography variant="caption" color="text.secondary">
+          🔒 All data is stored locally in your browser using localStorage
+        </Typography>
+      </Box>
     </Container>
   );
 };
